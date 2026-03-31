@@ -1,7 +1,9 @@
 # PawPal+ Project Reflection
 
 ## 1. System Design
-
+- User should be able to add pets
+- User should be able to add walking sessions in app.
+- User should be able to schedule medications daily and with time alarms or notifications.
 **a. Initial design**
 
 - Briefly describe your initial UML design.
