@@ -8,12 +8,38 @@
 
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
+Answer:
+The initial UML design follows a hierarchical structure typical of management applications, where a central user entity coordinates multiple sub-entities. The architecture is designed to separate user-specific data from the physical and medical logs of the pets.
+
+1. User Class
+The User class acts as the System Administrator. Its primary responsibility is account and relationship management.
+
+Responsibilities: It holds the credentials for the pet owner and maintains a collection of all registered pets. It acts as the entry point for the "Dashboard," aggregating data from all sub-classes to show a unified view of the day's tasks.
+
+2. Pet Class
+The Pet class is the Data Core and serves as the primary "Owner" of all activity logs.
+
+Responsibilities: It stores static biological data (species, breed, age) and manages the relationship with health and exercise records. Instead of the User "owning" a walk, the Pet owns the walk, which allows for better data organization if multiple people (e.g., family members) share care for one animal.
+
+3. WalkSession Class
+This class is the Activity Tracker. It is responsible for the temporal and physical data related to exercise.
+
+Responsibilities: It handles the logic for time-tracking (start/end) and calculates metrics like distance or duration. It provides a historical record of physical activity that can be referenced by the Pet class to monitor health trends.
+
+4. Medication Class
+The Medication class functions as the Scheduler and Notifier. It is the most logically complex class because it must handle recurring events.
+
+Responsibilities: It manages "State" (whether a pill was taken) and "Triggers" (when the phone should alert the user). It keeps a strict log of adherence, ensuring that the pet's medical history is accurate and that doses are not missed or doubled.
 
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+Changes made:
 
+✅ Added pet: Pet back-reference to both WalkSession and Medication eliminates the bottleneck of needing to pass species explicitly or traverse backwards.
+✅ Fixed parameter shadowing: setReminder(self, reminder_time: time) instead of setReminder(self, time: time).
+✅ Made constructors flexible: User, Pet now initialize empty lists by default; WalkSession and Medication have optional routePath and scheduledTimes.
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
