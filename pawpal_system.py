@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 
 class DashboardSummary:
+    """Initialize a dashboard summary with upcoming and overdue tasks."""
     def __init__(
         self,
         upcoming_walks: List[WalkSession],
@@ -19,6 +20,7 @@ class DashboardSummary:
 
 
 class Reminder:
+    """Initialize a reminder with a medication ID and time."""
     def __init__(self, medication_id: UUID, reminder_time: time) -> None:
         self.medication_id = medication_id
         self.reminder_time = reminder_time
@@ -26,6 +28,8 @@ class Reminder:
 
 class AdherenceEntry:
     def __init__(self, date_taken: date, was_taken: bool) -> None:
+        """Initialize an adherence entry tracking when a dose was taken."""
+
         self.date_taken = date_taken
         self.was_taken = was_taken
 
@@ -46,6 +50,7 @@ class WalkSession:
         distance: float,
         routePath: Optional[List[str]] = None,
     ) -> None:
+        """Initialize a walk session with pet, date, time, and route details."""
         self.walkId = walkId
         self.pet = pet
         self.date = date
@@ -90,6 +95,8 @@ class Medication:
         scheduledTimes: Optional[List[time]] = None,
         isCompleted: bool = False,
     ) -> None:
+        """Initialize a medication with drug name, dosage, frequency, and scheduled times."""
+
         self.medicationId = medicationId
         self.pet = pet
         self.drugName = drugName
@@ -128,6 +135,7 @@ class Pet:
         medicalRecords: Optional[List[Medication]] = None,
         walkHistory: Optional[List[WalkSession]] = None,
     ) -> None:
+        """Initialize a pet with name, species, breed, age, and empty task lists."""
         self.petId = petId
         self.name = name
         self.species = species
@@ -160,6 +168,7 @@ class Pet:
 
 class User:
     def __init__(self, userId: UUID, name: str, email: str, pets: Optional[List[Pet]] = None) -> None:
+        """Initialize a user with ID, name, email, and optional pet list."""
         self.userId = userId
         self.name = name
         self.email = email
@@ -199,6 +208,7 @@ class Scheduler:
     """The 'Brain' that retrieves, organizes, and manages tasks across pets."""
     
     def __init__(self, user: User) -> None:
+        """Initialize scheduler with a user."""
         self.user = user
 
     def get_all_tasks(self) -> List[Dict[str, Any]]:
