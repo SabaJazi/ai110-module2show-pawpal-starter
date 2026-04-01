@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 class DashboardSummary:
     """Initialize a dashboard summary with upcoming and overdue tasks."""
+
     def __init__(
         self,
         upcoming_walks: List[WalkSession],
@@ -21,6 +22,7 @@ class DashboardSummary:
 
 class Reminder:
     """Initialize a reminder with a medication ID and time."""
+
     def __init__(self, medication_id: UUID, reminder_time: time) -> None:
         self.medication_id = medication_id
         self.reminder_time = reminder_time
@@ -40,7 +42,7 @@ class Frequency(Enum):
 
 class Task:
     """Base class for all pet care tasks (walks, medications, etc)."""
-    
+
     def __init__(
         self,
         task_id: UUID,
@@ -55,16 +57,16 @@ class Task:
         self.frequency = frequency
         self.is_completed = is_completed
         self.scheduled_date = scheduled_date if scheduled_date is not None else date.today()
-    
+
     def mark_complete(self) -> Optional[Task]:
         """Mark task complete and create next recurring instance if applicable."""
         if self.is_completed:
             return None
-        
+
         self.is_completed = True
         next_task = self._create_next_occurrence()
         return next_task
-    
+
     def _create_next_occurrence(self) -> Optional[Task]:
         """Create the next recurring instance."""
         if self.frequency == Frequency.DAILY:
@@ -73,9 +75,9 @@ class Task:
             next_date = self.scheduled_date + timedelta(days=7)
         else:
             return None
-        
+
         return self._build_next_task(next_date)
-    
+
     def _build_next_task(self, next_date: date) -> Optional[Task]:
         """Build the next task instance. Subclasses override this."""
         raise NotImplementedError("Subclasses must implement _build_next_task")
@@ -111,11 +113,11 @@ class WalkSession(Task):
         """Saves duration, marks complete, and creates next recurring walk."""
         if self.is_completed:
             return None
-        
+
         self.duration = int((datetime.now() - self.startTime).total_seconds() // 60)
         self.is_completed = True
         print(f"Walk ended. Duration: {self.duration} minutes")
-        
+
         next_walk = self._create_next_occurrence()
         return next_walk
 
@@ -236,16 +238,15 @@ class Pet:
 
     def getUpcomingReminders(self) -> List[Reminder]:
         """Filters medications and sessions by the current date."""
-        today = date.today()
         upcoming_reminders = []
-        
+
         for medication in self.medicalRecords:
             if medication.frequency == Frequency.DAILY:
                 for scheduled_time in medication.scheduledTimes:
                     upcoming_reminders.append(
                         Reminder(medication.medicationId, scheduled_time)
                     )
-        
+
         return upcoming_reminders
 
 
@@ -274,22 +275,22 @@ class User:
         upcoming_walks = []
         upcoming_medications = []
         overdue_medications = []
-        
+
         for pet in self.pets:
             for walk in pet.walkHistory:
                 if walk.date >= today and not walk.is_completed:
                     upcoming_walks.append(walk)
-            
+
             for med in pet.medicalRecords:
-                if not med.isCompleted and med.frequency == Frequency.DAILY:
+                if not med.is_completed and med.frequency == Frequency.DAILY:
                     upcoming_medications.append(med)
-        
+
         return DashboardSummary(upcoming_walks, upcoming_medications, overdue_medications)
 
 
 class Scheduler:
     """The 'Brain' that retrieves, organizes, and manages tasks across pets."""
-    
+
     def __init__(self, user: User) -> None:
         """Initialize scheduler with a user."""
         self.user = user
@@ -297,7 +298,7 @@ class Scheduler:
     def get_all_tasks(self) -> List[Dict[str, Any]]:
         """Retrieves all tasks (walks and medications) across all pets."""
         tasks = []
-        
+
         for pet in self.user.pets:
             for walk in pet.walkHistory:
                 tasks.append({
@@ -308,7 +309,7 @@ class Scheduler:
                     "time": walk.startTime,
                     "completed": walk.is_completed,
                 })
-            
+
             for med in pet.medicalRecords:
                 for scheduled_time in med.scheduledTimes:
                     med_datetime = datetime.combine(med.scheduled_date, scheduled_time)
@@ -320,7 +321,7 @@ class Scheduler:
                         "time": med_datetime,
                         "completed": med.is_completed,
                     })
-        
+
         return tasks
 
     def get_tasks_by_date(self, target_date: date) -> List[Dict[str, Any]]:
@@ -333,9 +334,9 @@ class Scheduler:
         pet = next((p for p in self.user.pets if p.petId == pet_id), None)
         if not pet:
             return []
-        
+
         tasks = []
-        
+
         for walk in pet.walkHistory:
             tasks.append({
                 "type": "Walk",
@@ -344,7 +345,7 @@ class Scheduler:
                 "time": walk.startTime,
                 "completed": walk.is_completed,
             })
-        
+
         for med in pet.medicalRecords:
             for scheduled_time in med.scheduledTimes:
                 med_datetime = datetime.combine(med.scheduled_date, scheduled_time)
@@ -355,7 +356,7 @@ class Scheduler:
                     "time": med_datetime,
                     "completed": med.is_completed,
                 })
-        
+
         return tasks
 
     def get_overdue_tasks(self) -> List[Dict[str, Any]]:
@@ -370,7 +371,7 @@ class Scheduler:
         if not pet:
             print(f"Pet {pet_id} not found")
             return
-        
+
         if task_type == "Walk":
             walk = WalkSession(
                 walkId=uuid4(),
@@ -384,7 +385,7 @@ class Scheduler:
             )
             pet.walkHistory.append(walk)
             print(f"Scheduled walk for {pet.name} on {walk.date}")
-        
+
         elif task_type == "Medication":
             med = Medication(
                 medicationId=uuid4(),
@@ -408,49 +409,45 @@ class Scheduler:
     def check_conflicts(self, pet_id: Optional[UUID] = None) -> List[str]:
         """Detect tasks scheduled at the same time and return warnings."""
         warnings = []
-        
-        # Get tasks to check
+
         if pet_id:
             tasks = self.get_tasks_by_pet(pet_id)
         else:
             tasks = self.get_all_tasks()
-        
+
         if not tasks:
             return []
-        
-        # Group tasks by (date, time)
+
         time_groups: Dict[tuple, List[Dict[str, Any]]] = {}
         for task in tasks:
             key = (task["date"], task["time"])
             if key not in time_groups:
                 time_groups[key] = []
             time_groups[key].append(task)
-        
-        # Find conflicts
-        for (task_date, task_time), task_list in time_groups.items():
+
+        for (_, task_time), task_list in time_groups.items():
             if len(task_list) > 1:
                 time_str = task_time.strftime("%Y-%m-%d %H:%M") if isinstance(task_time, datetime) else str(task_time)
                 pet_names = [t.get("pet_name", "Unknown") for t in task_list]
                 types = [t["type"] for t in task_list]
-                
+
                 warning = (
-                    f"⚠️  CONFLICT at {time_str}: {len(task_list)} tasks "
+                    f"CONFLICT at {time_str}: {len(task_list)} tasks "
                     f"({', '.join(types)}) for {', '.join(set(pet_names))}"
                 )
                 warnings.append(warning)
-        
+
         return warnings
 
     def suggest_reschedule(self, pet_id: UUID, task_type: str, original_time: datetime) -> Optional[datetime]:
         """Suggest an available time slot if conflict detected."""
         current_tasks = self.get_tasks_by_pet(pet_id)
         occupied_times = {task["time"] for task in current_tasks}
-        
-        # Try 15-min intervals
+
         candidate = original_time.replace(minute=0, second=0)
-        for _ in range(48):  # Check next 12 hours
+        for _ in range(48):
             if candidate not in occupied_times:
                 return candidate
             candidate += timedelta(minutes=15)
-        
+
         return None
