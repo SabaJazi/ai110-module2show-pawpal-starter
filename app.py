@@ -1,4 +1,8 @@
 import streamlit as st
+from uuid import uuid4  
+from datetime import date, datetime
+
+from pawpal_system import User, Pet, WalkSession, Medication, Frequency, Scheduler
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -14,6 +18,9 @@ but **it does not implement the project logic**. Your job is to design the syste
 Use this app as your interactive demo once your backend classes/functions exist.
 """
 )
+
+st.divider()
+st.subheader("Owner & Pet Setup")
 
 with st.expander("Scenario", expanded=True):
     st.markdown(
@@ -35,8 +42,99 @@ At minimum, your system should:
 - Explain the plan (why each task was chosen and when it happens)
 """
     )
+owner_name = st.text_input("Owner name", value="Jordan")
+owner_email = st.text_input("Owner email", value="demo@example.com")
 
+
+if "owner" not in st.session_state:
+    st.session_state["owner"] = User(
+        userId=uuid4(),
+        name=owner_name,
+        email=owner_email,
+        pets=[],
+    )
+
+owner = st.session_state["owner"]
+owner.name = owner_name
+owner.email = owner_email
+
+pet_name = st.text_input("Pet name", value="Mochi")
+species = st.selectbox("Species", ["dog", "cat", "other"])
+breed = st.text_input("Breed", value="Mixed")
+age = st.number_input("Age", min_value=0, max_value=40, value=2)
+if st.button("Add pet"):
+    exists = any(p.name.lower() == pet_name.strip().lower() for p in owner.pets)
+    if exists:
+        st.info("That pet already exists for this owner.")
+    else:
+        new_pet = Pet(
+            petId=uuid4(),
+            name=pet_name.strip(),
+            species=species,
+            breed=breed.strip(),
+            age=int(age),
+        )
+        owner.addPet(new_pet)
+        st.success(f"Added pet: {new_pet.name}")
+if owner.pets:
+    st.write("Current pets:")
+    st.table(
+        [{"name": p.name, "species": p.species, "breed": p.breed, "age": p.age} for p in owner.pets]
+    )
+else:
+    st.info("No pets added yet.")
 st.divider()
+st.subheader("Schedule a Task")
+
+scheduler = Scheduler(owner)
+
+if not owner.pets:
+    st.warning("Add a pet first before scheduling tasks.")
+else:
+    pet_options = {f"{p.name} ({p.species})": p for p in owner.pets}
+    selected_pet_label = st.selectbox("Select pet", list(pet_options.keys()))
+    selected_pet = pet_options[selected_pet_label]
+
+    task_type = st.selectbox("Task type", ["Walk", "Medication"])
+
+    if task_type == "Walk":
+        walk_date = st.date_input("Walk date", value=date.today())
+        walk_time = st.time_input("Walk start time")
+        duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
+        distance = st.number_input("Distance", min_value=0.0, value=1.0, step=0.1)
+
+        if st.button("Schedule walk"):
+            scheduler.schedule_task(
+                pet_id=selected_pet.petId,
+                task_type="Walk",
+                task_data={
+                    "date": walk_date,
+                    "startTime": datetime.combine(walk_date, walk_time),
+                    "duration": int(duration),
+                    "distance": float(distance),
+                    "routePath": [],
+                },
+            )
+            st.success(f"Walk scheduled for {selected_pet.name}")
+
+    else:
+        drug_name = st.text_input("Medication name", value="Amoxicillin")
+        dosage = st.text_input("Dosage", value="250mg")
+        freq_label = st.selectbox("Frequency", ["DAILY", "WEEKLY"])
+        med_time = st.time_input("Medication time")
+
+        if st.button("Schedule medication"):
+            scheduler.schedule_task(
+                pet_id=selected_pet.petId,
+                task_type="Medication",
+                task_data={
+                    "drugName": drug_name.strip(),
+                    "dosage": dosage.strip(),
+                    "frequency": Frequency[freq_label],
+                    "scheduledTimes": [med_time],
+                },
+            )
+            st.success(f"Medication scheduled for {selected_pet.name}")
 
 st.subheader("Quick Demo Inputs (UI only)")
 owner_name = st.text_input("Owner name", value="Jordan")
@@ -73,10 +171,26 @@ st.divider()
 st.subheader("Build Schedule")
 st.caption("This button should call your scheduling logic once you implement it.")
 
+st.divider()
+st.subheader("Today's Schedule")
+
 if st.button("Generate schedule"):
-    st.warning(
-        "Not implemented yet. Next step: create your scheduling logic (classes/functions) and call it here."
-    )
+    today_tasks = scheduler.get_tasks_by_date(date.today())
+    if not today_tasks:
+        st.info("No tasks scheduled for today.")
+    else:
+        today_tasks.sort(key=lambda t: t["time"])
+        display_rows = [
+            {
+                "time": task["time"].strftime("%H:%M"),
+                "type": task["type"],
+                "pet": task.get("pet_name", ""),
+                "description": task["description"],
+                "completed": task["completed"],
+            }
+            for task in today_tasks
+        ]
+        st.table(display_rows)
     st.markdown(
         """
 Suggested approach:

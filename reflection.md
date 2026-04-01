@@ -53,7 +53,20 @@ Changes made:
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+Answer:
+The Scheduler makes this key tradeoff:
 
+Exact Time Matching vs. Duration Overlap Detection
+The tradeoff:
+
+✅ Fast & Simple: O(n) grouping, instant detection
+❌ Misses Real Conflicts: Doesn't account for task duration
+Why this tradeoff is reasonable:
+
+1- Most users schedule tasks at discrete, non-overlapping times anyway
+2- Keeps scheduler lightweight (important for Streamlit responsiveness)
+3- Simple to understand and debug
+4- Easy to improve later without breaking existing code
 ---
 
 ## 3. AI Collaboration

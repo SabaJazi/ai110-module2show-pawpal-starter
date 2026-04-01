@@ -29,7 +29,6 @@ class Reminder:
 class AdherenceEntry:
     def __init__(self, date_taken: date, was_taken: bool) -> None:
         """Initialize an adherence entry tracking when a dose was taken."""
-
         self.date_taken = date_taken
         self.was_taken = was_taken
 
@@ -39,7 +38,50 @@ class Frequency(Enum):
     WEEKLY = "WEEKLY"
 
 
-class WalkSession:
+class Task:
+    """Base class for all pet care tasks (walks, medications, etc)."""
+    
+    def __init__(
+        self,
+        task_id: UUID,
+        pet: Pet,
+        frequency: Frequency,
+        is_completed: bool = False,
+        scheduled_date: Optional[date] = None,
+    ) -> None:
+        """Initialize a base task with recurrence tracking."""
+        self.task_id = task_id
+        self.pet = pet
+        self.frequency = frequency
+        self.is_completed = is_completed
+        self.scheduled_date = scheduled_date if scheduled_date is not None else date.today()
+    
+    def mark_complete(self) -> Optional[Task]:
+        """Mark task complete and create next recurring instance if applicable."""
+        if self.is_completed:
+            return None
+        
+        self.is_completed = True
+        next_task = self._create_next_occurrence()
+        return next_task
+    
+    def _create_next_occurrence(self) -> Optional[Task]:
+        """Create the next recurring instance."""
+        if self.frequency == Frequency.DAILY:
+            next_date = self.scheduled_date + timedelta(days=1)
+        elif self.frequency == Frequency.WEEKLY:
+            next_date = self.scheduled_date + timedelta(days=7)
+        else:
+            return None
+        
+        return self._build_next_task(next_date)
+    
+    def _build_next_task(self, next_date: date) -> Optional[Task]:
+        """Build the next task instance. Subclasses override this."""
+        raise NotImplementedError("Subclasses must implement _build_next_task")
+
+
+class WalkSession(Task):
     def __init__(
         self,
         walkId: UUID,
@@ -49,28 +91,49 @@ class WalkSession:
         duration: int,
         distance: float,
         routePath: Optional[List[str]] = None,
+        frequency: Frequency = Frequency.DAILY,
     ) -> None:
         """Initialize a walk session with pet, date, time, and route details."""
+        super().__init__(task_id=walkId, pet=pet, frequency=frequency, scheduled_date=date)
         self.walkId = walkId
-        self.pet = pet
         self.date = date
         self.startTime = startTime
         self.duration = duration
         self.distance = distance
         self.routePath = routePath if routePath is not None else []
-        self.is_completed = False
 
     def startWalk(self) -> None:
         """Begins timing and GPS tracking."""
         self.startTime = datetime.now()
         print(f"Walk started at {self.startTime}")
 
-    def endWalk(self) -> None:
-        """Saves the duration and distance to the pet's history."""
-        if self.startTime:
-            self.duration = int((datetime.now() - self.startTime).total_seconds() // 60)
-            self.is_completed = True
-            print(f"Walk ended. Duration: {self.duration} minutes")
+    def endWalk(self) -> Optional[WalkSession]:
+        """Saves duration, marks complete, and creates next recurring walk."""
+        if self.is_completed:
+            return None
+        
+        self.duration = int((datetime.now() - self.startTime).total_seconds() // 60)
+        self.is_completed = True
+        print(f"Walk ended. Duration: {self.duration} minutes")
+        
+        next_walk = self._create_next_occurrence()
+        return next_walk
+
+    def _build_next_task(self, next_date: date) -> Optional[WalkSession]:
+        """Build next walk instance."""
+        next_walk = WalkSession(
+            walkId=uuid4(),
+            pet=self.pet,
+            date=next_date,
+            startTime=datetime.combine(next_date, self.startTime.time()),
+            duration=0,
+            distance=0.0,
+            routePath=list(self.routePath),
+            frequency=self.frequency,
+        )
+        self.pet.walkHistory.append(next_walk)
+        print(f"Created next {self.frequency.value.lower()} walk for {next_date}")
+        return next_walk
 
     def calculateCalories(self, species: str, distance: float) -> float:
         """Estimates energy burned based on pet species and distance."""
@@ -84,7 +147,7 @@ class WalkSession:
         return distance * factor
 
 
-class Medication:
+class Medication(Task):
     def __init__(
         self,
         medicationId: UUID,
@@ -94,16 +157,14 @@ class Medication:
         frequency: Frequency,
         scheduledTimes: Optional[List[time]] = None,
         isCompleted: bool = False,
+        scheduledDate: Optional[date] = None,
     ) -> None:
-        """Initialize a medication with drug name, dosage, frequency, and scheduled times."""
-
+        """Initialize a medication task with drug name, dosage, frequency, and scheduled times."""
+        super().__init__(task_id=medicationId, pet=pet, frequency=frequency, is_completed=isCompleted, scheduled_date=scheduledDate)
         self.medicationId = medicationId
-        self.pet = pet
         self.drugName = drugName
         self.dosage = dosage
-        self.frequency = frequency
         self.scheduledTimes = scheduledTimes if scheduledTimes is not None else []
-        self.isCompleted = isCompleted
         self.adherence_log: List[AdherenceEntry] = []
 
     def setReminder(self, reminder_time: time) -> None:
@@ -112,12 +173,34 @@ class Medication:
             self.scheduledTimes.append(reminder_time)
             print(f"Reminder set for {self.drugName} at {reminder_time}")
 
-    def markAsTaken(self) -> None:
-        """Updates the status for the current time slot."""
-        self.isCompleted = True
+    def markAsTaken(self) -> Optional[Medication]:
+        """Marks medication taken and creates next recurring instance."""
+        if self.is_completed:
+            return None
+
+        self.is_completed = True
         today = date.today()
         self.adherence_log.append(AdherenceEntry(today, True))
         print(f"{self.drugName} marked as taken on {today}")
+
+        next_med = self._create_next_occurrence()
+        return next_med
+
+    def _build_next_task(self, next_date: date) -> Optional[Medication]:
+        """Build next medication instance."""
+        next_medication = Medication(
+            medicationId=uuid4(),
+            pet=self.pet,
+            drugName=self.drugName,
+            dosage=self.dosage,
+            frequency=self.frequency,
+            scheduledTimes=list(self.scheduledTimes),
+            isCompleted=False,
+            scheduledDate=next_date,
+        )
+        self.pet.medicalRecords.append(next_medication)
+        print(f"Created next {self.frequency.value.lower()} dose for {next_date}")
+        return next_medication
 
     def getAdherenceLog(self) -> List[AdherenceEntry]:
         """Returns a history of missed vs. taken doses."""
@@ -228,15 +311,14 @@ class Scheduler:
             
             for med in pet.medicalRecords:
                 for scheduled_time in med.scheduledTimes:
-                    # Normalize time to datetime for consistent sorting
-                    med_datetime = datetime.combine(date.today(), scheduled_time)
+                    med_datetime = datetime.combine(med.scheduled_date, scheduled_time)
                     tasks.append({
                         "type": "Medication",
                         "pet_name": pet.name,
                         "description": f"{med.drugName} ({med.dosage}) for {pet.name}",
-                        "date": date.today(),
-                        "time": med_datetime,  # Now a datetime, not time
-                        "completed": med.isCompleted,
+                        "date": med.scheduled_date,
+                        "time": med_datetime,
+                        "completed": med.is_completed,
                     })
         
         return tasks
@@ -265,13 +347,13 @@ class Scheduler:
         
         for med in pet.medicalRecords:
             for scheduled_time in med.scheduledTimes:
-                med_datetime = datetime.combine(date.today(), scheduled_time)
+                med_datetime = datetime.combine(med.scheduled_date, scheduled_time)
                 tasks.append({
                     "type": "Medication",
                     "description": f"{med.drugName} ({med.dosage})",
-                    "date": date.today(),
-                    "time": med_datetime,  # Now a datetime, not time
-                    "completed": med.isCompleted,
+                    "date": med.scheduled_date,
+                    "time": med_datetime,
+                    "completed": med.is_completed,
                 })
         
         return tasks
@@ -298,6 +380,7 @@ class Scheduler:
                 duration=task_data.get("duration", 0),
                 distance=task_data.get("distance", 0.0),
                 routePath=task_data.get("routePath"),
+                frequency=task_data.get("frequency", Frequency.DAILY),
             )
             pet.walkHistory.append(walk)
             print(f"Scheduled walk for {pet.name} on {walk.date}")
@@ -313,3 +396,61 @@ class Scheduler:
             )
             pet.medicalRecords.append(med)
             print(f"Scheduled medication {med.drugName} for {pet.name}")
+
+    def sort_by_time(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Sorts tasks by their scheduled time."""
+        return sorted(tasks, key=lambda x: x["time"])
+
+    def filter_by_status(self, tasks: List[Dict[str, Any]], completed: bool) -> List[Dict[str, Any]]:
+        """Filters tasks by completion status."""
+        return [task for task in tasks if task["completed"] == completed]
+
+    def check_conflicts(self, pet_id: Optional[UUID] = None) -> List[str]:
+        """Detect tasks scheduled at the same time and return warnings."""
+        warnings = []
+        
+        # Get tasks to check
+        if pet_id:
+            tasks = self.get_tasks_by_pet(pet_id)
+        else:
+            tasks = self.get_all_tasks()
+        
+        if not tasks:
+            return []
+        
+        # Group tasks by (date, time)
+        time_groups: Dict[tuple, List[Dict[str, Any]]] = {}
+        for task in tasks:
+            key = (task["date"], task["time"])
+            if key not in time_groups:
+                time_groups[key] = []
+            time_groups[key].append(task)
+        
+        # Find conflicts
+        for (task_date, task_time), task_list in time_groups.items():
+            if len(task_list) > 1:
+                time_str = task_time.strftime("%Y-%m-%d %H:%M") if isinstance(task_time, datetime) else str(task_time)
+                pet_names = [t.get("pet_name", "Unknown") for t in task_list]
+                types = [t["type"] for t in task_list]
+                
+                warning = (
+                    f"⚠️  CONFLICT at {time_str}: {len(task_list)} tasks "
+                    f"({', '.join(types)}) for {', '.join(set(pet_names))}"
+                )
+                warnings.append(warning)
+        
+        return warnings
+
+    def suggest_reschedule(self, pet_id: UUID, task_type: str, original_time: datetime) -> Optional[datetime]:
+        """Suggest an available time slot if conflict detected."""
+        current_tasks = self.get_tasks_by_pet(pet_id)
+        occupied_times = {task["time"] for task in current_tasks}
+        
+        # Try 15-min intervals
+        candidate = original_time.replace(minute=0, second=0)
+        for _ in range(48):  # Check next 12 hours
+            if candidate not in occupied_times:
+                return candidate
+            candidate += timedelta(minutes=15)
+        
+        return None

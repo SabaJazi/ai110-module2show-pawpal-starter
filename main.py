@@ -1,120 +1,75 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
+
 from uuid import uuid4
 from pawpal_system import User, Pet, WalkSession, Medication, Frequency, Scheduler
 
+def print_tasks(title, tasks):
+    # Helper function to print tasks in a readable format
+    print("\n" + "=" * 70)
+    print(title)
+    print("=" * 70)
+    if not tasks:
+        print("No tasks found.")
+        return
+    for i, task in enumerate(tasks, 1):
+        task_time = task["time"]
+        time_str = task_time.strftime("%Y-%m-%d %H:%M") if isinstance(task_time, datetime) else str(task_time)
+        print(f"{i}. {task['type']} | {time_str} | {task['description']} | Completed: {task['completed']}")
 
 def main():
-    # Create an Owner (User)
-    owner_id = uuid4()
-    owner = User(
-        userId=owner_id,
-        name="Alice Johnson",
-        email="alice@example.com",
-    )
+    # Create sample data
+    owner = User(userId=uuid4(), name="Alice Johnson", email="alice@example.com")
+    dog = Pet(petId=uuid4(), name="Max", species="Dog", breed="Golden Retriever", age=5)
+    cat = Pet(petId=uuid4(), name="Whiskers", species="Cat", breed="Persian", age=3)
     
-    # Create two Pets
-    dog_id = uuid4()
-    dog = Pet(
-        petId=dog_id,
-        name="Max",
-        species="Dog",
-        breed="Golden Retriever",
-        age=5,
-    )
-    
-    cat_id = uuid4()
-    cat = Pet(
-        petId=cat_id,
-        name="Whiskers",
-        species="Cat",
-        breed="Persian",
-        age=3,
-    )
-    
-    # Add pets to owner
     owner.addPet(dog)
     owner.addPet(cat)
     
-    # Create at least three tasks with different times
     today = date.today()
+    yesterday = today - timedelta(days=1)
     
-    # Task 1: Morning walk for Max
-    walk_1 = WalkSession(
-        walkId=uuid4(),
-        pet=dog,
-        date=today,
-        startTime=datetime.combine(today, time(7, 0)),
-        duration=30,
-        distance=3.5,
-    )
-    dog.walkHistory.append(walk_1)
+    # Add tasks
+    dog.walkHistory.append(WalkSession(walkId=uuid4(), pet=dog, date=today, startTime=datetime.combine(today, time(18, 0)), duration=30, distance=3.5))
+    dog.walkHistory.append(WalkSession(walkId=uuid4(), pet=dog, date=today, startTime=datetime.combine(today, time(18, 0)), duration=20, distance=2.0))  # CONFLICT: same time as above
+    dog.walkHistory.append(WalkSession(walkId=uuid4(), pet=dog, date=yesterday, startTime=datetime.combine(yesterday, time(20, 0)), duration=20, distance=2.0))
     
-    # Task 2: Afternoon medication for Whiskers
-    med_1 = Medication(
-        medicationId=uuid4(),
-        pet=cat,
-        drugName="Amoxicillin",
-        dosage="250mg",
-        frequency=Frequency.DAILY,
-        scheduledTimes=[time(14, 0)],
-    )
-    cat.medicalRecords.append(med_1)
+    cat.medicalRecords.append(Medication(medicationId=uuid4(), pet=cat, drugName="Amoxicillin", dosage="250mg", frequency=Frequency.DAILY, scheduledTimes=[time(14, 0)]))
+    dog.medicalRecords.append(Medication(medicationId=uuid4(), pet=dog, drugName="Aspirin", dosage="100mg", frequency=Frequency.DAILY, scheduledTimes=[time(19, 0), time(9, 0)]))
     
-    # Task 3: Evening walk for Max
-    walk_2 = WalkSession(
-        walkId=uuid4(),
-        pet=dog,
-        date=today,
-        startTime=datetime.combine(today, time(18, 30)),
-        duration=45,
-        distance=5.0,
-    )
-    dog.walkHistory.append(walk_2)
-    
-    # Additional task: Evening medication for Max
-    med_2 = Medication(
-        medicationId=uuid4(),
-        pet=dog,
-        drugName="Aspirin",
-        dosage="100mg",
-        frequency=Frequency.DAILY,
-        scheduledTimes=[time(19, 0), time(9, 0)],
-    )
-    dog.medicalRecords.append(med_2)
-    
-    # Create a Scheduler and get today's tasks
     scheduler = Scheduler(owner)
-    todays_tasks = scheduler.get_tasks_by_date(today)
     
-    # Print Today's Schedule
-    print("=" * 60)
-    print(f"TODAY'S SCHEDULE - {owner.name}")
-    print(f"Date: {today}")
-    print("=" * 60)
-    print()
+    # Check conflicts
+    print("\n" + "=" * 70)
+    print("CONFLICT DETECTION")
+    print("=" * 70)
     
-    if todays_tasks:
-        # Sort tasks by time
-        todays_tasks.sort(key=lambda x: x["time"])
-        
-        for i, task in enumerate(todays_tasks, 1):
-            task_time = task["time"]
-            if isinstance(task_time, datetime):
-                time_str = task_time.strftime("%H:%M")
-            else:
-                time_str = str(task_time)
-            
-            print(f"{i}. [{time_str}] {task['type']} - {task['description']}")
-            print(f"   Pet: {task['pet_name']}")
-            print(f"   Status: {'✓ Completed' if task['completed'] else '○ Pending'}")
-            print()
+    conflicts = scheduler.check_conflicts()
+    if conflicts:
+        for warning in conflicts:
+            print(warning)
     else:
-        print("No tasks scheduled for today.")
+        print("No conflicts detected.")
     
-    print("=" * 60)
-    print(f"Total tasks today: {len(todays_tasks)}")
-    print("=" * 60)
+    pet_conflicts = scheduler.check_conflicts(pet_id=dog.petId)
+    if pet_conflicts:
+        print(f"\nConflicts for Max:\n" + "\n".join(pet_conflicts))
+        suggested = scheduler.suggest_reschedule(dog.petId, "Walk", datetime.now())
+        if suggested:
+            print(f"Try scheduling at {suggested.strftime('%H:%M')} instead")
+    
 
+# 1) Sorting check: all tasks sorted by time
+    all_tasks = scheduler.get_all_tasks()
+    print_tasks("ALL TASKS (SORTED BY TIME)", sorted(all_tasks, key=lambda task: task["time"]))
+    
+    todays_tasks = scheduler.get_tasks_by_date(today)
+    print_tasks(f"TODAY'S TASKS ({today})", sorted(todays_tasks, key=lambda task: task["time"]))
+    
+    dog_tasks = scheduler.get_tasks_by_pet(dog.petId)
+    print_tasks(f"TASKS FOR PET: {dog.name}", sorted(dog_tasks, key=lambda task: task["time"]))
+    
+    overdue_tasks = scheduler.get_overdue_tasks()
+    print_tasks("OVERDUE TASKS", sorted(overdue_tasks, key=lambda task: task["time"]))
 
 if __name__ == "__main__":
     main()
