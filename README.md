@@ -22,6 +22,19 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Features
+
+- Chronological task sorting: Orders walk and medication tasks by scheduled timestamp.
+- Status filtering: Splits tasks into pending vs completed views.
+- Conflict warnings: Detects duplicate schedule slots and reports human-readable conflict alerts.
+- Daily and weekly recurrence: Completing a recurring task auto-creates the next occurrence (daily +1 day, weekly +7 days).
+- Date-based retrieval: Pulls tasks for a target day to support daily planning views.
+- Overdue detection: Flags tasks scheduled before today that remain incomplete.
+- Pet-scoped scheduling: Schedules walk and medication tasks for a selected pet profile.
+- Reminder handling: Stores medication reminder times and prevents duplicate reminders.
+- Adherence logging: Records medication intake events with date and taken status.
+- Reschedule suggestion: Proposes the next available 15-minute slot when looking for alternatives.
+
 ## Getting started
 
 ### Setup
@@ -61,3 +74,6 @@ What the tests currently cover:
 Confidence Level: 4/5 stars
 
 Reasoning: Current results show 8 passing unit tests, including key scheduling logic. Reliability looks good for core behaviors, but confidence is not 5/5 yet because edge cases such as timezone handling, DST transitions, and invalid-input validation are not fully covered.
+
+## Demo
+![PawPal App](ai4.png)

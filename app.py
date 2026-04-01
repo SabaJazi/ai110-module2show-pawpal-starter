@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from uuid import uuid4  
 from datetime import date, datetime
 
@@ -42,8 +43,8 @@ At minimum, your system should:
 - Explain the plan (why each task was chosen and when it happens)
 """
     )
-owner_name = st.text_input("Owner name", value="Jordan")
-owner_email = st.text_input("Owner email", value="demo@example.com")
+owner_name = st.text_input("Owner name", value="Jordan", key="setup_owner_name")
+owner_email = st.text_input("Owner email", value="demo@example.com", key="setup_owner_email")
 
 
 if "owner" not in st.session_state:
@@ -58,10 +59,10 @@ owner = st.session_state["owner"]
 owner.name = owner_name
 owner.email = owner_email
 
-pet_name = st.text_input("Pet name", value="Mochi")
-species = st.selectbox("Species", ["dog", "cat", "other"])
-breed = st.text_input("Breed", value="Mixed")
-age = st.number_input("Age", min_value=0, max_value=40, value=2)
+pet_name = st.text_input("Pet name", value="Mochi", key="setup_pet_name")
+species = st.selectbox("Species", ["dog", "cat", "other"], key="setup_species")
+breed = st.text_input("Breed", value="Mixed", key="setup_breed")
+age = st.number_input("Age", min_value=0, max_value=40, value=2, key="setup_age")
 if st.button("Add pet"):
     exists = any(p.name.lower() == pet_name.strip().lower() for p in owner.pets)
     if exists:
@@ -92,16 +93,16 @@ if not owner.pets:
     st.warning("Add a pet first before scheduling tasks.")
 else:
     pet_options = {f"{p.name} ({p.species})": p for p in owner.pets}
-    selected_pet_label = st.selectbox("Select pet", list(pet_options.keys()))
+    selected_pet_label = st.selectbox("Select pet", list(pet_options.keys()), key="selected_pet")
     selected_pet = pet_options[selected_pet_label]
 
-    task_type = st.selectbox("Task type", ["Walk", "Medication"])
+    task_type = st.selectbox("Task type", ["Walk", "Medication"], key="schedule_task_type")
 
     if task_type == "Walk":
-        walk_date = st.date_input("Walk date", value=date.today())
-        walk_time = st.time_input("Walk start time")
-        duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
-        distance = st.number_input("Distance", min_value=0.0, value=1.0, step=0.1)
+        walk_date = st.date_input("Walk date", value=date.today(), key="walk_date")
+        walk_time = st.time_input("Walk start time", key="walk_time")
+        duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20, key="walk_duration")
+        distance = st.number_input("Distance", min_value=0.0, value=1.0, step=0.1, key="walk_distance")
 
         if st.button("Schedule walk"):
             scheduler.schedule_task(
@@ -118,10 +119,10 @@ else:
             st.success(f"Walk scheduled for {selected_pet.name}")
 
     else:
-        drug_name = st.text_input("Medication name", value="Amoxicillin")
-        dosage = st.text_input("Dosage", value="250mg")
-        freq_label = st.selectbox("Frequency", ["DAILY", "WEEKLY"])
-        med_time = st.time_input("Medication time")
+        drug_name = st.text_input("Medication name", value="Amoxicillin", key="med_name")
+        dosage = st.text_input("Dosage", value="250mg", key="med_dosage")
+        freq_label = st.selectbox("Frequency", ["DAILY", "WEEKLY"], key="med_frequency")
+        med_time = st.time_input("Medication time", key="med_time")
 
         if st.button("Schedule medication"):
             scheduler.schedule_task(
@@ -137,9 +138,9 @@ else:
             st.success(f"Medication scheduled for {selected_pet.name}")
 
 st.subheader("Quick Demo Inputs (UI only)")
-owner_name = st.text_input("Owner name", value="Jordan")
-pet_name = st.text_input("Pet name", value="Mochi")
-species = st.selectbox("Species", ["dog", "cat", "other"])
+owner_name = st.text_input("Owner name", value="Jordan", key="quick_owner_name")
+pet_name = st.text_input("Pet name", value="Mochi", key="quick_pet_name")
+species = st.selectbox("Species", ["dog", "cat", "other"], key="quick_species")
 
 st.markdown("### Tasks")
 st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
@@ -149,11 +150,11 @@ if "tasks" not in st.session_state:
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    task_title = st.text_input("Task title", value="Morning walk")
+    task_title = st.text_input("Task title", value="Morning walk", key="quick_task_title")
 with col2:
-    duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
+    duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20, key="quick_duration")
 with col3:
-    priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+    priority = st.selectbox("Priority", ["low", "medium", "high"], index=2, key="quick_priority")
 
 if st.button("Add task"):
     st.session_state.tasks.append(
@@ -176,10 +177,21 @@ st.subheader("Today's Schedule")
 
 if st.button("Generate schedule"):
     today_tasks = scheduler.get_tasks_by_date(date.today())
+
     if not today_tasks:
         st.info("No tasks scheduled for today.")
     else:
-        today_tasks.sort(key=lambda t: t["time"])
+        sorted_tasks = scheduler.sort_by_time(today_tasks)
+        pending_tasks = scheduler.filter_by_status(sorted_tasks, completed=False)
+        completed_tasks = scheduler.filter_by_status(sorted_tasks, completed=True)
+
+        st.success(f"Schedule generated with {len(sorted_tasks)} task(s) for today.")
+
+        summary_col1, summary_col2, summary_col3 = st.columns(3)
+        summary_col1.metric("Total", len(sorted_tasks))
+        summary_col2.metric("Pending", len(pending_tasks))
+        summary_col3.metric("Completed", len(completed_tasks))
+
         display_rows = [
             {
                 "time": task["time"].strftime("%H:%M"),
@@ -188,9 +200,48 @@ if st.button("Generate schedule"):
                 "description": task["description"],
                 "completed": task["completed"],
             }
-            for task in today_tasks
+            for task in sorted_tasks
         ]
-        st.table(display_rows)
+
+        schedule_df = pd.DataFrame(display_rows)
+
+        def highlight_status(row):
+            row_color = "#eaf7ee" if row["completed"] else "#fff4e5"
+            return [f"background-color: {row_color}"] * len(row)
+
+        st.markdown("### Full Schedule (Sorted)")
+        st.dataframe(
+            schedule_df.style.apply(highlight_status, axis=1),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        pending_rows = [row for row in display_rows if not row["completed"]]
+        completed_rows = [row for row in display_rows if row["completed"]]
+
+        pending_col, completed_col = st.columns(2)
+        with pending_col:
+            st.markdown("#### Pending Tasks")
+            if pending_rows:
+                st.dataframe(pd.DataFrame(pending_rows), use_container_width=True, hide_index=True)
+            else:
+                st.success("All tasks are completed for today.")
+
+        with completed_col:
+            st.markdown("#### Completed Tasks")
+            if completed_rows:
+                st.dataframe(pd.DataFrame(completed_rows), use_container_width=True, hide_index=True)
+            else:
+                st.info("No completed tasks yet.")
+
+    conflicts = scheduler.check_conflicts()
+    if conflicts:
+        st.warning("Scheduling conflicts detected:")
+        for warning in conflicts:
+            st.write(f"- {warning}")
+    else:
+        st.success("No scheduling conflicts detected.")
+
     st.markdown(
         """
 Suggested approach:

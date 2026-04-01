@@ -74,13 +74,29 @@ Why this tradeoff is reasonable:
 **a. How you used AI**
 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+Answer: 
+I used AI tools in four main ways during this project:
 
+- Design brainstorming: I used AI early to turn project requirements into a class structure (User, Pet, Task, WalkSession, Medication, Scheduler) and to identify relationships and responsibilities for UML.
+- Debugging: I used AI to diagnose runtime and test issues, especially constructor naming mismatches (isCompleted vs is_completed), circular import errors, and Streamlit duplicate widget key errors.
+- Refactoring and alignment: I used AI to refactor code so implementation and tests matched, and to connect UI behavior directly to Scheduler methods (sorting, filtering, conflict checks) instead of ad-hoc UI logic.
+- Documentation support: I used AI to draft README improvements (features, test command, confidence statement) and to update UML text so it matched the final implementation.
+- What kinds of prompts or questions were most helpful?
+Answer:
+Very specific, outcome-focused prompts with constraints (for example: “include these three tests,” “use Scheduler methods,” “keep it aligned with current code”) produced the best and fastest results.
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
+Answer:
+One clear moment was when an AI-generated test edit accidentally overwrote my core system file and introduced a self-import in pawpal_system.py, which caused a circular import error during test collection. I did not accept that change as-is. Instead, I reviewed the traceback, compared file contents, restored pawpal_system.py to the actual class implementation, and then re-ran the test suite to verify the fix. This was a good reminder that AI output is useful, but it still needs code review and validation before being trusted.
 - How did you evaluate or verify what the AI suggested?
+I verified AI suggestions using a simple three-step process:
 
+- Static code review: I checked whether the suggested change matched my class design, method names, and data flow (especially around Task, Medication, Scheduler, and Streamlit keys).
+- Error-driven validation: I used stack traces and failing test output to confirm root causes before applying fixes (for example, circular import and constructor-argument mismatches).
+- Behavioral testing: I re-ran my test suite and manually checked key app behavior (sorting, recurrence, conflict warnings, and UI rendering) to ensure the fix worked and did not break existing features.
+
+I accepted AI output only when it passed all three checks.
 ---
 
 ## 4. Testing and Verification
@@ -88,12 +104,25 @@ Why this tradeoff is reasonable:
 **a. What you tested**
 
 - What behaviors did you test?
-- Why were these tests important?
+I tested the following core behaviors:
 
+-Medication completion flow: calling markAsTaken() correctly updates completion state.
+-Walk completion flow: calling endWalk() marks the walk as completed.
+-Task addition integrity: adding walk and medication tasks increases the correct pet record counts (single and multiple additions).
+-Sorting correctness: scheduler returns tasks in chronological order when sorted by time.
+-Recurrence logic: completing a daily medication creates the next occurrence for the following day.
+-Conflict detection: scheduler flags duplicate scheduled times as conflicts.
+- Why were these tests important?
+These tests cover the most failure-prone parts of the app and reduce the risk of missed care tasks, duplicate scheduling, or misleading schedule output.
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
+Confidence Level: 4/5 stars
+
+Reasoning: Current results show 8 passing unit tests, including key scheduling logic. Reliability looks good for core behaviors, but confidence is not 5/5 yet because edge cases such as timezone handling, DST transitions, and invalid-input validation are not fully covered.
 - What edge cases would you test next if you had more time?
+Answer:
+If I had more time, I would test: end-of-month and leap-day recurrence, duplicate completion calls (to prevent double next-task creation), timezone and DST transitions, invalid inputs (missing date/time or bad frequency), and tie-breaking when tasks share the same timestamp.
 
 ---
 
@@ -102,11 +131,17 @@ Why this tradeoff is reasonable:
 **a. What went well**
 
 - What part of this project are you most satisfied with?
+Answer:
+I am most satisfied with how the backend scheduler and the Streamlit UI now align. The app does not just display placeholder data anymore; it uses the Scheduler methods for sorting, filtering, recurrence outcomes, and conflict warnings, which makes the demo reflect real system behavior.
 
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
+Answer:
+In another iteration, I would redesign conflict detection to consider duration overlap instead of exact-time matches only, normalize all naming conventions (for example isCompleted vs is_completed), and add stronger input validation and persistence (database storage instead of in-memory session state).
 
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+Answer:
+A key takeaway is that AI is most effective as a collaborator, not an autopilot. The best results came from giving precise prompts, reviewing each suggestion against the system design, and verifying behavior with tests before accepting changes.
